@@ -1,0 +1,1 @@
+https://www.modelscope.cn/models/iic/speech_eres2net_sv_zh-cn_16k-common/summary

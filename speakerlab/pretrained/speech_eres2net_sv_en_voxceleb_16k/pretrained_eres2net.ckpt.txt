@@ -1,0 +1,1 @@
+https://www.modelscope.cn/models/iic/speech_eres2net_sv_en_voxceleb_16k/summary

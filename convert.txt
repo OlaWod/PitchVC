@@ -1,0 +1,6 @@
+title1|src1.wav|dataset/audio/p244/p244_008.wav|p244|dataset/spk/p244/p244_008.npy
+title2|src2.wav|dataset/audio/p244/p244_008.wav|p244|dataset/spk/p244/p244_008.npy
+title3|src3.wav|dataset/audio/p244/p244_008.wav|p244|dataset/spk/p244/p244_008.npy
+title4|src4.wav|dataset/audio/p261/p261_023.wav|p261|dataset/spk/p261/p261_023.npy
+title5|src5.wav|dataset/audio/p261/p261_023.wav|p261|dataset/spk/p261/p261_023.npy
+title6|src6.wav|dataset/audio/p261/p261_023.wav|p261|dataset/spk/p261/p261_023.npy
