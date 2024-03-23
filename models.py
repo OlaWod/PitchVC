@@ -1,4 +1,3 @@
-import math
 import torch
 import torch.nn.functional as F
 import torch.nn as nn
@@ -486,9 +485,6 @@ class Generator(torch.nn.Module):
         g = g + spk_emb.unsqueeze(-1)
 
         f0, _, _ = self.F0_model(mel.unsqueeze(1))
-        if len(f0.shape) == 1:
-            f0 = f0.unsqueeze(0)
-        
         f0 = self.f0_upsamp(f0[:, None]).transpose(1, 2)  # bs,n,t
 
         har_source, _, _ = self.m_source(f0)
@@ -526,28 +522,21 @@ class Generator(torch.nn.Module):
 
         return spec, phase
 
-    def get_f0(self, mel, f0_mean_tgt, voiced_threshold=10, interp=True):
+    def get_f0(self, mel, f0_mean_tgt, voiced_threshold=10):
         f0, _, _ = self.F0_model(mel.unsqueeze(1))
-
         voiced = f0 > voiced_threshold
 
         lf0 = torch.log(f0)
-        lf0_mean = lf0[voiced].mean()
-        lf0_adj = lf0 - lf0_mean + math.log(f0_mean_tgt)
+        lf0_ = lf0 * voiced.float()
+        lf0_mean = lf0_.sum(1) / voiced.float().sum(1) 
+        lf0_mean = lf0_mean.unsqueeze(1)
+        lf0_adj = lf0 - lf0_mean + torch.log(f0_mean_tgt)
         f0_adj = torch.exp(lf0_adj)
 
-        f0_adj = torch.where(voiced, f0_adj, 0)
-
-        # interpolate unsilent unvoiced f0 frames
-        if interp:
-            f0_adj = self.interp_f0(f0_adj.unsqueeze(0), voiced.unsqueeze(0)).squeeze(0)
-            energy = torch.sum(mel.squeeze(0), dim=0) # simple vad
-            unsilent = energy > -700
-            unsilent = unsilent | voiced
-            f0_adj = torch.where(unsilent, f0_adj, 0)
-
-        if len(f0_adj.shape) == 1:
-            f0_adj = f0_adj.unsqueeze(0)
+        energy = mel.sum(1)
+        unsilent = energy > -700
+        unsilent = unsilent | voiced    # simple vad
+        f0_adj = f0_adj * unsilent.float()
 
         return f0_adj
     
@@ -562,7 +551,7 @@ class Generator(torch.nn.Module):
 
         return x
     
-    def infer(self, x, f0, stft):
+    def infer(self, x, f0):
         f0 = self.f0_upsamp(f0[:, None]).transpose(1, 2)  # bs,n,t
         
         har_source, _, _ = self.m_source(f0)
@@ -593,62 +582,8 @@ class Generator(torch.nn.Module):
         spec = torch.exp(x[:,:self.post_n_fft // 2 + 1, :])
         phase = torch.sin(x[:, self.post_n_fft // 2 + 1:, :])
 
-        y = stft.inverse(spec, phase)
-
+        y = self.stft.inverse(spec, phase)
         return y
-    
-    def interp_f0(self, pitch, voiced):
-        """Fill unvoiced regions via linear interpolation"""
-
-        # Handle no voiced frames
-        if not voiced.any():
-            return pitch
-
-        # Pitch is linear in base-2 log-space
-        pitch = torch.log2(pitch)
-
-        # Anchor endpoints
-        pitch[..., 0] = pitch[voiced][..., 0]
-        pitch[..., -1] = pitch[voiced][..., -1]
-        voiced[..., 0] = True
-        voiced[..., -1] = True
-
-        # Interpolate
-        pitch[~voiced] = self.interp(
-            torch.where(~voiced[0])[0][None],
-            torch.where(voiced[0])[0][None],
-            pitch[voiced][None])
-
-        return 2 ** pitch
-    
-    @staticmethod
-    def interp(x, xp, fp):
-        """1D linear interpolation for monotonically increasing sample points"""
-        # Handle edge cases
-        if xp.shape[-1] == 0:
-            return x
-        if xp.shape[-1] == 1:
-            return torch.full(
-                x.shape,
-                fp.squeeze(),
-                device=fp.device,
-                dtype=fp.dtype)
-
-        # Get slope and intercept using right-side first-differences
-        m = (fp[:, 1:] - fp[:, :-1]) / (xp[:, 1:] - xp[:, :-1])
-        b = fp[:, :-1] - (m.mul(xp[:, :-1]))
-
-        # Get indices to sample slope and intercept
-        indicies = torch.sum(torch.ge(x[:, :, None], xp[:, None, :]), -1) - 1
-        indicies = torch.clamp(indicies, 0, m.shape[-1] - 1)
-        line_idx = torch.linspace(
-            0,
-            indicies.shape[0],
-            1,
-            device=indicies.device).to(torch.long).expand(indicies.shape)
-
-        # Interpolate
-        return m[line_idx, indicies].mul(x) + b[line_idx, indicies]
 
     def remove_weight_norm(self):
         print('Removing weight norm...')

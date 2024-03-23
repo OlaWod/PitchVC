@@ -14,7 +14,6 @@ from transformers import WavLMModel
 from env import AttrDict
 from meldataset import mel_spectrogram, MAX_WAV_VALUE
 from models import Generator
-from stft import TorchSTFT
 from Utils.JDC.model import JDCNet
 from asv import compute_similarity2, compute_embedding, get_asv_models
 
@@ -22,10 +21,9 @@ from thop import profile, clever_format
 
 
 class Model(torch.nn.Module):
-    def __init__(self, generator, stft, wavlm):
+    def __init__(self, generator, wavlm):
         super().__init__()
         self.generator = generator
-        self.stft = stft
         self.wavlm = wavlm
 
     def forward(self, wav, mel, f0_mean_tgt, spk_emb, spk_id):
@@ -35,17 +33,25 @@ class Model(torch.nn.Module):
 
         f0 = self.generator.get_f0(mel, f0_mean_tgt)
         x = self.generator.get_x(x, spk_emb, spk_id)
-        y = self.generator.infer(x, f0, self.stft)
+        y = self.generator.infer(x, f0)
+
+
+class F0(torch.nn.Module):
+    def __init__(self, generator):
+        super().__init__()
+        self.generator = generator
+
+    def forward(self, mel, f0_mean_tgt):
+        f0 = self.generator.get_f0(mel, f0_mean_tgt)
 
 
 class Voc(torch.nn.Module):
-    def __init__(self, generator, stft):
+    def __init__(self, generator):
         super().__init__()
         self.generator = generator
-        self.stft = stft
 
     def forward(self, x, f0):
-        y = self.generator.infer(x, f0, self.stft)
+        y = self.generator.infer(x, f0)
 
 
 class Enc(torch.nn.Module):
@@ -104,7 +110,6 @@ if __name__ == "__main__":
     # load models
     F0_model = JDCNet(num_class=1, seq_len=192)
     generator = Generator(h, F0_model)#.to(device)
-    stft = TorchSTFT(filter_length=h.gen_istft_n_fft, hop_length=h.gen_istft_hop_size, win_length=h.gen_istft_n_fft)#.to(device)
 
     # state_dict_g = torch.load(args.ptfile, map_location=device)
     # generator.load_state_dict(state_dict_g['generator'], strict=True)
@@ -126,8 +131,9 @@ if __name__ == "__main__":
         lines = f.readlines()
 
     # define model & modules
-    model = Model(generator, stft, wavlm)#.to(device)
-    mvoc = Voc(generator, stft)#.to(device)
+    model = Model(generator, wavlm)#.to(device)
+    mf0 = F0(generator)#.to(device)
+    mvoc = Voc(generator)#.to(device)
     menc = Enc(generator)#.to(device)
     mdec = Dec(generator)#.to(device)
     mspk = Spk(generator)#.to(device)
@@ -145,6 +151,7 @@ if __name__ == "__main__":
         spk_emb = torch.from_numpy(spk_emb).unsqueeze(0)#.to(device)
 
         f0_mean_tgt = f0_stats[tgt_spk]["mean"]
+        f0_mean_tgt = torch.FloatTensor([f0_mean_tgt]).unsqueeze(0)#.to(device)
 
         wav_tgt, sr = librosa.load(tgt_wav, sr=16000)
         wav_tgt = torch.FloatTensor(wav_tgt)#.to(device)
@@ -157,6 +164,12 @@ if __name__ == "__main__":
         # macs: model
         print("--- model ---")
         macs, params = profile(model, inputs=(wav, mel, f0_mean_tgt, spk_emb, spk_id))
+        macs, params = clever_format([macs, params], "%.3f")
+        print(macs, params)
+
+        # macs: f0
+        print("--- f0 ---")
+        macs, params = profile(mf0, inputs=(mel, f0_mean_tgt))
         macs, params = clever_format([macs, params], "%.3f")
         print(macs, params)
 
@@ -205,7 +218,7 @@ if __name__ == "__main__":
         # cvt
         # f0 = generator.get_f0(mel, f0_mean_tgt)
         # x = generator.get_x(x, spk_emb, spk_id)
-        # y = get_best_wav(x, f0, wav_tgt, generator, stft, embedding_models, feature_extractor, search=args.search)
+        # y = get_best_wav(x, f0, wav_tgt, generator, embedding_models, feature_extractor, search=args.search)
         
         # audio = y.squeeze()
         # audio = audio / torch.max(torch.abs(audio)) * 0.95

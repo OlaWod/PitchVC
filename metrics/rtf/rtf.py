@@ -15,7 +15,6 @@ from transformers import WavLMModel
 from env import AttrDict
 from meldataset import mel_spectrogram, MAX_WAV_VALUE
 from models import Generator
-from stft import TorchSTFT
 from Utils.JDC.model import JDCNet
 from asv import compute_similarity2, compute_embedding, get_asv_models
 
@@ -36,8 +35,8 @@ def get_sim(y, emb_tgts, embedding_models, feature_extractor):
     return similarity
 
 
-def get_best_wav(x, initial_f0, wav_tgt, generator, stft, embedding_models, feature_extractor, search):
-    y = generator.infer(x, initial_f0, stft)
+def get_best_wav(x, initial_f0, wav_tgt, generator, embedding_models, feature_extractor, search):
+    y = generator.infer(x, initial_f0)
     if not search:
         return y
     
@@ -61,7 +60,7 @@ def get_best_wav(x, initial_f0, wav_tgt, generator, stft, embedding_models, feat
             lf0 = initial_lf0 + step * i
             f0 = torch.exp(lf0)
             f0 = torch.where(voiced, f0, initial_f0)
-            y = generator.infer(x, initial_f0, stft)
+            y = generator.infer(x, initial_f0)
 
             similarity = get_sim(y, emb_tgts, embedding_models, feature_extractor)
 
@@ -105,7 +104,6 @@ if __name__ == "__main__":
     # load models
     F0_model = JDCNet(num_class=1, seq_len=192)
     generator = Generator(h, F0_model).to(device)
-    stft = TorchSTFT(filter_length=h.gen_istft_n_fft, hop_length=h.gen_istft_hop_size, win_length=h.gen_istft_n_fft).to(device)
 
     state_dict_g = torch.load(args.ptfile, map_location=device)
     generator.load_state_dict(state_dict_g['generator'], strict=True)
@@ -153,6 +151,7 @@ if __name__ == "__main__":
             spk_emb = torch.from_numpy(spk_emb).unsqueeze(0).to(device)
 
             f0_mean_tgt = f0_stats[tgt_spk]["mean"]
+            f0_mean_tgt = torch.FloatTensor([f0_mean_tgt]).unsqueeze(0).to(device)
 
             wav_tgt, sr = librosa.load(tgt_wav, sr=16000)
             wav_tgt = torch.FloatTensor(wav_tgt).to(device)
@@ -172,7 +171,7 @@ if __name__ == "__main__":
             # cvt
             f0 = generator.get_f0(mel, f0_mean_tgt)
             x = generator.get_x(x, spk_emb, spk_id)
-            y = get_best_wav(x, f0, wav_tgt, generator, stft, embedding_models, feature_extractor, search=args.search)
+            y = get_best_wav(x, f0, wav_tgt, generator, embedding_models, feature_extractor, search=args.search)
             
             rtf = (time.time() - start) / length_y
             total_rtf += rtf

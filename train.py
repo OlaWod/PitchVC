@@ -43,7 +43,8 @@ def train(rank, a, h):
     wavlm.eval()
     wavlm.to(device)
 
-    vocoder = HIFIGAN.from_hparams(source="speechbrain/tts-hifigan-libritts-16kHz", savedir="vocoder_16khz", run_opts={"device": device})
+    if h.use_aug:
+        vocoder = HIFIGAN.from_hparams(source="speechbrain/tts-hifigan-libritts-16kHz", savedir="vocoder_16khz", run_opts={"device": device})
 
     generator = Generator(h, F0_model).to(device)
     mpd = MultiPeriodDiscriminator().to(device)
