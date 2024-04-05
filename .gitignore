@@ -10,8 +10,16 @@ metrics/*/TEST_*
 metrics/*/result
 metrics/*/tmp
 metrics/*/txts
+
 test/TEST_*
 test/txts
+
+openvino_/cpp/libtorch
+openvino_/cpp/build
+openvino_/cpp/assets/dataset
+openvino_/cpp/assets/jsons
+openvino_/cpp/assets/models
+openvino_/cpp/test
 
 *.ckpt
 *.pt
