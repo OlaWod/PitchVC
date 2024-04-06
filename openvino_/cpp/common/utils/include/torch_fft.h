@@ -1,6 +1,7 @@
 #include <torch/torch.h>
 
 #include "format_reader_ptr.h"
+#include "tensor.h"
 
 namespace F = torch::nn::functional;
 
@@ -65,13 +66,8 @@ public:
 
             window = torch::hann_window(win_length);
 
-            std::filesystem::path mel_basis_path = assets_dir / "mel_basis.npy";
-            FormatReader::ReaderPtr mel_basis_reader(mel_basis_path.c_str());
-            if (mel_basis_reader.get() == nullptr) {
-                throw std::logic_error("mel_basis.npy cannot be read!");
-            }
-            std::shared_ptr<unsigned char> mel_basis_data = mel_basis_reader->getData();
-            mel_basis = torch::from_blob(mel_basis_data.get(), {80, 513});
+            std::filesystem::path mel_basis_path = assets_dir / "mel_basis.pt";
+            mel_basis = load_torch_tensor(mel_basis_path);
     }
 
     torch::Tensor get_mel(torch::Tensor y) {

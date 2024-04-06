@@ -25,3 +25,5 @@ openvino_/cpp/test
 *.pt
 *.pth
 *.t7
+
+!openvino_/cpp/assets/mel_basis.pt

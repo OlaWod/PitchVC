@@ -12,6 +12,20 @@
 #include <codecvt>
 #include <locale>
 
+torch::Tensor load_torch_tensor(const std::string& path) 
+{
+   std::ifstream input(path, std::ios::binary);
+   std::vector<char> bytes(
+      (std::istreambuf_iterator<char>(input)),
+      (std::istreambuf_iterator<char>()));
+   input.close();
+
+   torch::IValue x = torch::pickle_load(bytes);
+   torch::Tensor tensor = x.toTensor();
+
+   return tensor;
+}
+
 static void save_torch_tensor(torch::Tensor tensor, const std::string& path) {
    auto bytes = torch::pickle_save(tensor);
    std::ofstream fout(path, std::ios::out | std::ios::binary);
