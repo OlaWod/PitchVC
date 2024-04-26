@@ -1,12 +1,19 @@
+
+#pragma once
+
+#include <iostream>
+#include <filesystem>
+#include <cmath>
+
 #include <torch/torch.h>
 
-#include "format_reader_ptr.h"
 #include "tensor.h"
+
+
+namespace ufft {
 
 namespace F = torch::nn::functional;
 
-
-namespace tfft{
 
 class TorchSTFT : public torch::nn::Module {
 public:
@@ -18,7 +25,7 @@ public:
         window = torch::hann_window(win_length);
     }
 
-    std::tuple<torch::Tensor, torch::Tensor> transform(torch::Tensor y) {
+    std::tuple<torch::Tensor, torch::Tensor> transform(torch::Tensor y) const {
         y = F::pad(y.unsqueeze(1), F::PadFuncOptions({lpad, rpad}).mode(torch::kReflect));
         y = y.squeeze(1);
 
@@ -34,7 +41,7 @@ public:
         return std::make_tuple(magnitude, phase);
     }
 
-    torch::Tensor inverse(torch::Tensor magnitude, torch::Tensor phase) {
+    torch::Tensor inverse(torch::Tensor magnitude, torch::Tensor phase) const {
         torch::Tensor zero = torch::zeros_like(phase);
         phase = torch::complex(zero, phase);
         torch::Tensor x = magnitude * torch::exp(phase);
@@ -67,10 +74,10 @@ public:
             window = torch::hann_window(win_length);
 
             std::filesystem::path mel_basis_path = assets_dir / "mel_basis.pt";
-            mel_basis = load_torch_tensor(mel_basis_path);
+            mel_basis = ut::load_torch_tensor(mel_basis_path);
     }
 
-    torch::Tensor get_mel(torch::Tensor y) {
+    torch::Tensor get_mel(torch::Tensor y) const {
         y = F::pad(y.unsqueeze(1), F::PadFuncOptions({pad, pad}).mode(torch::kReflect));
         y = y.squeeze(1);
 
@@ -95,9 +102,9 @@ private:
     torch::Tensor window;
     torch::Tensor mel_basis;
 
-    torch::Tensor dynamic_range_compression_torch(torch::Tensor x, float C=1, float clip_val=1e-5) {
+    torch::Tensor dynamic_range_compression_torch(torch::Tensor x, float C=1, float clip_val=1e-5) const {
         return torch::log(torch::clamp(x, clip_val) * C);
     }
 };
 
-} // namespace fft
+} // namespace ufft

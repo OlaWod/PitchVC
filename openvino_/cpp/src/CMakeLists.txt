@@ -6,9 +6,4 @@ find_package(Torch REQUIRED)
 
 add_executable(${EXECNAME} "main.cpp")
 
-target_link_libraries(${EXECNAME} PRIVATE
-                        "${TORCH_LIBRARIES}"
-                        openvino::runtime 
-                        format_reader 
-                        ie_samples_utils
-                        )
+target_link_libraries(${EXECNAME} PRIVATE openvino::runtime "${TORCH_LIBRARIES}")
