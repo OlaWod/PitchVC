@@ -57,6 +57,13 @@ CUDA_VISIBLE_DEVICES=0 python convert_mp.py --hpfile config_v1_16k.json --ptfile
 CUDA_VISIBLE_DEVICES=0 python convert_mp.py --hpfile config_v1_16k.json --ptfile exp/default/g_00700000 --txtpath convert.txt --outdir outputs/test --n_processes 6 --search
 ```
 
+convert.txt:
+```txt
+{title}|{source_wav_path}|{target_spk_reference_wav_path}|{target_spk_id}|{target_spk_reference_embedding_path}
+e.g.
+title1|src1.wav|dataset/audio/p244/p244_008.wav|p244|dataset/spk/p244/p244_008.npy
+```
+
 ## Training Example
 Files on demand:
 1. [VCTK](https://datashare.ed.ac.uk/handle/10283/3443) dataset
